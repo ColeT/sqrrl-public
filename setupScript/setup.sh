@@ -16,6 +16,9 @@ fi
 sudo apt-get -qy install openjdk-6-jdk &
 javaInstall=$!
 
+#TODO: Check if java install kicks back after ~a second and check error code, then update if need be instead of at start
+
+bigtopMirror=http://archive.apache.org/dist/
 if [ -n "$1" ]; then
   if wget -qO- $1 | grep "bigtop" >> /dev/null 2>&1; then
     apacheMirror=$1
@@ -28,12 +31,12 @@ if [ -z $apacheMirror ]; then
 fi
 
 #And bigtop gpg key
-wget -O- $apacheMirror/incubator/bigtop/bigtop-0.3.0-incubating/repos/GPG-KEY-bigtop | sudo apt-key add -
+wget -O- $bigtopMirror/incubator/bigtop/bigtop-0.3.0-incubating/repos/GPG-KEY-bigtop | sudo apt-key add -
 
 bigtopFile=/etc/apt/sources.list.d/bigtop.list
 
 #populating apt with our bigtop file
-echo "deb $apacheMirror/incubator/bigtop/bigtop-0.3.0-incubating/repos/ubuntu bigtop contrib" | sudo tee $bigtopFile
+echo "deb $bigtopMirror/incubator/bigtop/bigtop-0.3.0-incubating/repos/ubuntu bigtop contrib" | sudo tee $bigtopFile
 
 #need to wait for first apt install to finish before more apt installs
 wait $javaInstall
@@ -51,8 +54,12 @@ sudo apt-get -q update -o Dir::Etc::sourcelist="sources.list.d/bigtop.list" -o D
 sudo apt-get -qy install hadoop-conf-pseudo zookeeper-server 
 
 #Everything else we'll have to install down. The installs aren't heavy, but the checkout and build are very heavy, so lets start them asap 
-sudo apt-get -qy install maven2 subversion make g++ g++-multilib; svn co https://svn.apache.org/repos/asf/accumulo/branches/1.4.2/ /tmp/accumulo; cd /tmp/accumulo/src/server/src/main/c++/nativeMap; make; cd /tmp/accumulo/; mvn package -D maven.test.skip=true&& mvn assembly:single -N &
-accumuloInstall=$!
+sudo apt-get -qy install make g++ g++-multilib; 
+cd /tmp; 
+wget --tries=0 --read-timeout=5 $apacheMirror/accumulo/1.4.2/accumulo-1.4.2-dist.tar.gz
+tar -xzf accumulo-1.4.2-dist.tar.gz
+cd /tmp/accumulo-1.4.2/src/server/src/main/c++/nativeMap
+make
 
 #hadoop via bigtop needs these dirs, but bigtop doesn't handle them. It does make the hdfs user/group which are necessary for them. So we do it after the fact
 sudo mkdir -p /var/lib/hadoop/cache/hadoop/dfs/name /var/lib/hadoop/cache/hadoop/dfs/data
@@ -73,11 +80,7 @@ sudo sed -e 's/maxClientCnxns=50/maxClientCnxns=100/' -i /etc/zookeeper/conf/zoo
 sudo /etc/init.d/zookeeper-server restart &
 zookeeperStart=$!
 
-#lets wait for that giant command to finish 
-wait $accumuloInstall
-
-#And now lets put it in a good directory
-tar xzf /tmp/accumulo/target/accumulo-1.4.2-dist.tar.gz -C /tmp
+#And now lets put accumulo in a good directory
 sudo mkdir /usr/lib/accumulo
 sudo mv /tmp/accumulo-1.4.2/* /usr/lib/accumulo/
 
