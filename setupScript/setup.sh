@@ -43,7 +43,6 @@ wait $javaInstall
 JAVA_HOME=`readlink -f \`which java\``
 JAVA_HOME=`dirname $JAVA_HOME`
 JAVA_HOME=`dirname $JAVA_HOME`
-JAVA_HOME=`dirname $JAVA_HOME`
 
 echo "JAVA_HOME=$JAVA_HOME" >> ~/.profile
 export JAVA_HOME=$JAVA_HOME
